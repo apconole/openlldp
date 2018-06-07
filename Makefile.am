@@ -1,6 +1,9 @@
 # target programs to be installed in ${sbindir}
 sbin_PROGRAMS = lldpad dcbtool lldptool vdptool
 
+check_PROGRAMS = basman_test
+TESTS = $(check_PROGRAMS)
+
 # package nltest and vdptest, but do not install it anywhere
 if BUILD_DEBUG
 noinst_PROGRAMS = nltest vdptest qbg22sim
@@ -86,9 +89,9 @@ vdptool_LDADD = liblldp_clif.la
 vdptool_LDFLAGS = -llldp_clif $(LIBNL_LIBS)
 
 dcbtool_SOURCES = dcbtool.c dcbtool_cmds.c parse_cli.l \
-weak_readline.c $(lldpad_include_HEADERS) $(noinst_HEADERS)
+weak_readline.c lldp_rtnl.c lldp_util.c $(lldpad_include_HEADERS) $(noinst_HEADERS)
 dcbtool_LDADD = liblldp_clif.la
-dcbtool_LDFLAGS = -ldl -llldp_clif
+dcbtool_LDFLAGS = -ldl -llldp_clif $(LIBNL_LIBS)
 
 lldptool_SOURCES = lldptool.c lldptool_cmds.c lldp_rtnl.c \
 		   lldp_mand_clif.c lldp_basman_clif.c lldp_med_clif.c \
@@ -98,6 +101,12 @@ lldptool_SOURCES = lldptool.c lldptool_cmds.c lldp_rtnl.c \
 		   weak_readline.c $(lldpad_include_HEADERS) $(noinst_HEADERS)
 lldptool_LDADD = liblldp_clif.la
 lldptool_LDFLAGS = -ldl -llldp_clif $(LIBNL_LIBS)
+
+unit_test_SRCS = test/units.c test/units.h
+
+basman_test_SOURCES = test/basman_test.c $(unit_test_SRCS) \
+	lldp_basman_clif.c lldp_util.c lldp_rtnl.c
+basman_test_LDFLAGS = -lrt $(LIBNL_LIBS)
 
 if BUILD_DEBUG
 nltest_SOURCES = test/nltest.c test/nltest.h

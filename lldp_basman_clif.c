@@ -272,8 +272,17 @@ void print_mng_addr(u16 len, char *info)
 		memset(buf, 0, sizeof(buf));
 		if (hexstr2bin(info+offset, (u8 *)&buf, oidlen))
 			printf("\tOID: Error parsing OID\n");
-		else
-			printf("\tOID: %s\n", buf);
+		else {
+			printf("\tOID: 0.");
+			for (i = 0; i < oidlen; i++) {
+				char bt;
+				hexstr2bin(info+offset+(i*2), (u8 *)&bt, 1);
+				printf("%d", bt);
+				if (i != (oidlen - 1))
+					printf(".");
+			}
+            printf("\n");
+		}
 	} else if (oidlen > 128) {
 		printf("\tOID: Invalid length = %d\n", oidlen);
 	}
