@@ -406,7 +406,7 @@ int main(int argc, char *argv[])
 			goto out_fail;
 		}
 	} else if (pid != DONT_KILL_PID) {
-		if (!kill(pid, 0)) {
+		if (!kill(pid, 0) && errno != ESRCH) {
 			LLDPAD_ERR("lldpad already running");
 			goto out_fail;
 		}
