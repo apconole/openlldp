@@ -2,7 +2,7 @@ language: c
 
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install flex libconfig9 libconfig-dev
+  - sudo apt-get install flex libconfig9 libconfig-dev libnl-3-dev libnl-3-200 libnl-genl-3-200 libnl-genl-3-dev libnl-nf-3-200 libnl-nf-3-dev 
 
 compiler:
    - gcc
