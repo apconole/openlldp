@@ -1,8 +1,8 @@
 # target programs to be installed in ${sbindir}
 sbin_PROGRAMS = lldpad dcbtool lldptool vdptool
-
-check_PROGRAMS = lldp_clif_test
-TESTS = $(check_PROGRAMS)
+check_SCRIPTS =
+check_PROGRAMS =
+EXTRA_DIST =
 
 # package nltest and vdptest, but do not install it anywhere
 if BUILD_DEBUG
@@ -146,10 +146,6 @@ dist_bashcompletion_DATA = contrib/bash_completion/lldpad contrib/bash_completio
 
 AM_DISTCHECK_CONFIGURE_FLAGS = --enable-debug
 
-lldp_clif_test_SOURCES = test/lldp_clif_test.c lldp_basman_clif.c lldp_util.c \
-	lldp_rtnl.c
-lldp_clif_test_LDFLAGS = -lrt $(LIBNL_LIBS)
-
 RPMBUILD_TOP = $(abs_top_builddir)/rpm/rpmbuild
 RPMBUILD_OPT ?= --without check
 
@@ -160,3 +156,5 @@ rpm: dist $(srcdir)/lldpad.spec
 	rpmbuild ${RPMBUILD_OPT} \
                  -D "_topdir ${RPMBUILD_TOP}" \
                  -ba $(srcdir)/lldpad.spec
+
+include test/automake.am

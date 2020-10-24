@@ -133,6 +133,12 @@ AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT8_T
 
-AC_CONFIG_FILES([Makefile include/version.h lldpad.spec lldpad.pc liblldp_clif.pc])
+AC_CONFIG_FILES(Makefile)
+AC_CONFIG_FILES(include/version.h)
+AC_CONFIG_FILES(lldpad.spec)
+AC_CONFIG_FILES(lldpad.pc)
+AC_CONFIG_FILES(liblldp_clif.pc)
+AC_CONFIG_FILES(test/atlocal)
+
 AC_CONFIG_MACRO_DIR([m4])
 AC_OUTPUT

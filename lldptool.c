@@ -293,7 +293,7 @@ static void cli_msg_cb(char *msg, UNUSED size_t len)
 */
 static int _clif_command(struct clif *clif, char *cmd, int print)
 {
-	char buf[MAX_CLIF_MSGBUF];
+	char buf[MAX_CLIF_MSGBUF] = {0};
 	size_t len;
 	int ret;
 

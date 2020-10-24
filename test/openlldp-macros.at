@@ -1,0 +1,175 @@
+dnl Make AT_SETUP automatically run the lldpad_init() shell function
+dnl as the first step in every test.
+m4_rename([AT_SETUP], [OPENLLDP_AT_SETUP])
+m4_define([AT_SETUP], [OPENLLDP_AT_SETUP($@)
+lldpad_init
+])
+
+dnl Make AT_CLEANUP check for lldpad / other errors as the last step
+dnl in every test.
+m4_rename([AT_CLEANUP], [OPENLLDP_AT_CLEANUP])
+m4_define([AT_CLEANUP], [lldpad_cleanup
+OPENLLDP_AT_CLEANUP($@)
+])
+
+dnl START_SHELL_HELPERS...END_SHELL_HELPERS may bracket shell
+dnl function definitions that invoke AT_CHECK and other Autotest macros
+dnl that can ordinarily be run only within AT_SETUP...AT_CLEANUP.
+m4_define([START_SHELL_HELPERS],
+  [m4_ifdef([AT_ingroup], [m4_fatal([$0: AT_SETUP and DEFINE_SHELL_HELPERS may not nest])])
+   m4_define([AT_ingroup])
+   m4_divert_push([PREPARE_TESTS])])
+m4_define([END_SHELL_HELPERS], [
+   m4_divert_pop([PREPARE_TESTS])
+   m4_undefine([AT_ingroup])])
+
+
+m4_divert_push([PREPARE_TESTS])
+[
+lldpad_init() {
+    lldpad_base=`pwd`
+    trap lldpad_on_exit 0
+    : > cleanup
+}
+
+lldpad_on_exit () {
+    . "$lldpad_base/cleanup"
+}
+
+# Prints the integers from $1 to $2, increasing by $3 (default 1) on stdout.
+seq () {
+    if test $# = 1; then
+        set 1 $1
+    fi
+    while test $1 -le $2; do
+        echo $1
+        set `expr $1 + ${3-1}` $2 $3
+    done
+}
+
+# parent_pid PID
+#
+# Prints the PID of the parent of process PID.
+parent_pid () {
+    # Using "ps" is portable to any POSIX system, but busybox "ps" (used in
+    # e.g. Alpine Linux) is noncompliant, so we use a Linux-specific approach
+    # when it's available.  We check the format of the status file to avoid
+    # the NetBSD file with the same name but different contents.
+    if egrep '^PPid:[[:space:]]*[0-9]*$' /proc/$1/status > /dev/null 2>&1; then
+        sed -n 's/^PPid:	\([0-9]*\)/\1/p' /proc/$1/status
+    else
+        ps -o ppid= -p $1
+    fi
+}
+
+kill_lldpad () {
+
+    # Use provided PID or save the current PID if available.
+    TMPPID=$1
+    if test -z "$TMPPID"; then
+        TMPPID=$(cat $lldpad_base/lldpad.pid 2>/dev/null)
+    fi
+
+    # try killing lldpad
+    lldpad -k
+
+    # Nothing else to be done if there is no PID
+    test -z "$TMPPID" && return
+
+    for i in 1 2 3 4 5 6 7 8 9; do
+        # Check if the daemon is alive.
+        kill -0 $TMPPID 2>/dev/null || return
+
+        # Fallback to whole number since POSIX doesn't require
+        # fractional times to work.
+        sleep 0.1 || sleep 1
+    done
+
+    # Make sure it is terminated.
+    kill $TMPPID
+
+}
+
+# Normalize the output of 'wc' to match POSIX.
+# POSIX says 'wc' should print "%d %d %d", but GNU prints "%7d %7d %7d".
+# POSIX says 'wc -l' should print "%d %s", but BSD prints "%8d".
+#
+# This fixes all of those (it will screw up filenames that contain
+# multiple sequential spaces, but that doesn't really matter).
+wc () {
+   command wc "$@" | tr -s ' ' ' ' | sed 's/^ *//'
+}
+
+# run_as PROGRAM_NAME COMMAND [ARG...]
+#
+# Runs a command with argv[0] set to PROGRAM_NAME, if possible, in a
+# subshell.  Most utilities print argc[0] as part of their messages,
+# so this makes it easier to figure out which particular utility
+# prints a message if a bunch of identical processes are running.
+#
+# Not all shells support "exec -a NAME", so test for it.
+if (exec -a myname true 2>/dev/null); then
+    run_as () {
+        (exec -a "$@")
+    }
+else
+    run_as () {
+        shift
+        (exec "$@")
+    }
+fi
+]
+m4_divert_pop([PREPARE_TESTS])
+
+START_SHELL_HELPERS
+lldpad_cleanup() {
+    if test "$(echo asan.*)" != 'asan.*'; then
+        echo "Address Sanitizer reported errors in:" asan.*
+        cat asan.*
+        AT_FAIL_IF([:])
+    fi
+}
+END_SHELL_HELPERS
+
+dnl on_exit "COMMAND"
+dnl
+dnl Add the shell COMMAND to a collection executed when the current test
+dnl completes, as a cleanup action.  (The most common use is to kill a
+dnl daemon started by the test.  This is important to prevent tests that
+dnl start daemons from hanging at exit.)
+dnl
+dnl Cleanup commands are executed in the reverse order of calls to this
+dnl function.
+m4_divert_text([PREPARE_TESTS], [dnl
+on_exit () {
+    (echo "$1"; cat cleanup) > cleanup.tmp
+    mv cleanup.tmp cleanup
+}
+])
+
+dnl Autoconf 2.63 compatibility verison of macro introduced in Autoconf 2.64:
+m4_ifndef([AS_VAR_APPEND],
+  [m4_divert_text([PREPARE_TESTS],
+    [as_var_append () {
+       eval $1=\$$1\$2
+     }
+])
+   m4_define([AS_VAR_APPEND], [as_var_append $1 $2])])
+
+dnl Autoconf 2.63 compatibility verison of macro introduced in Autoconf 2.64:
+m4_ifndef([AT_CHECK_UNQUOTED],
+  [m4_define([AT_CHECK_UNQUOTED],
+  [_AT_CHECK([$1], [$2], AS_ESCAPE(m4_dquote(m4_expand([$3])), [""]),
+    AS_ESCAPE(m4_dquote(m4_expand([$4])),[""]), [$5], [$6])])])
+
+dnl Autoconf 2.63 compatibility verison of macro introduced in Autoconf 2.64:
+m4_ifndef([AT_SKIP_IF],
+  [m4_define([AT_SKIP_IF],
+    [AT_CHECK([($1) \
+    && exit 77 || exit 0], [0], [ignore], [ignore])])])
+
+dnl Autoconf 2.63 compatibility verison of macro introduced in Autoconf 2.64:
+m4_ifndef([AT_FAIL_IF],
+  [m4_define([AT_FAIL_IF],
+    [AT_CHECK([($1) \
+    && exit 99 || exit 0], [0], [ignore], [ignore])])])
