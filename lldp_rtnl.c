@@ -33,6 +33,8 @@
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <net/ethernet.h>
+#include <netlink/netlink.h>
+#include <netlink/msg.h>
 #include "linux/netlink.h"
 #include "linux/rtnetlink.h"
 #include "linux/dcbnl.h"
@@ -41,6 +43,9 @@
 #include "lldp_rtnl.h"
 #include "messages.h"
 #include "lldp.h"
+#if HAVE_SNMP
+#include "snmp/snmp/snmp_agent.h"
+#endif
 
 #define NLMSG(c) ((struct nlmsghdr *) (c))
 
@@ -330,3 +335,170 @@ out:
 out_nosock:
 	return rc;
 }
+
+#if HAVE_SNMP
+static void prepare_lrt_device_list(void)
+{
+	struct link_rtnl_list *lrd;
+
+	LIST_FOREACH (lrd, &linkrtl_head, entries)
+		lrd->active = 0;
+}
+
+static void cleanup_lrt_device_list(void)
+{
+	struct link_rtnl_list *lrd, *safe;
+
+    if (LIST_EMPTY(&linkrtl_head)) {
+        return;
+    }
+
+	LIST_FOREACH_SAFE (safe, lrd, &linkrtl_head, entries) {
+		if (!lrd->active) {
+			LIST_REMOVE(lrd, entries);
+
+			free(lrd->ifname);
+			free(lrd->iim);
+			free(lrd);
+		}
+	}
+}
+
+static void snmp_parse_msg(struct nlmsghdr *h)
+{
+	struct ifinfomsg *ifm = (void *)h + NLMSG_ALIGN(sizeof(struct nlmsghdr));
+	struct link_rtnl_list *lrd, *old;
+	char mac[MAC_ADDR_STRLEN] = {0};
+	char *tmp_mac, *ifname = NULL;
+	struct rtattr *attribute;
+	struct ifinfomsg *iface;
+	int len;
+
+	iface = NLMSG_DATA(h);
+	len = h->nlmsg_len - NLMSG_LENGTH(sizeof(*iface));
+
+	lrd = calloc(1, sizeof(struct link_rtnl_list));
+	if (!lrd)
+		return;
+
+	lrd->iim = calloc(1, sizeof(struct ifinfomsg));
+	if (!lrd->iim) {
+		free(lrd);
+		return;
+	}
+
+	for (attribute = IFLA_RTA(iface); RTA_OK(attribute, len);
+		 attribute = RTA_NEXT(attribute, len)) {
+		switch (attribute->rta_type) {
+		case IFLA_ADDRESS:
+			tmp_mac = (char *)RTA_DATA(attribute);
+			print_mac(tmp_mac, mac);
+			str2mac(mac, lrd->mac, sizeof(lrd->mac));
+			break;
+		case IFLA_IFNAME:
+			if (ifname) {
+				free(ifname);
+			}
+			ifname = (char *)RTA_DATA(attribute);
+			lrd->ifname = strndup(ifname, strlen(ifname) + 1);
+			break;
+		default:
+			break;
+		}
+	}
+
+	LIST_FOREACH (old, &linkrtl_head, entries) {
+		if (!strncmp(old->ifname, lrd->ifname, strlen(lrd->ifname)) &&
+			!strncmp(old->ifname, lrd->ifname, strlen(old->ifname))) {
+			old->active = 1;
+			memcpy(old->iim, ifm, sizeof(struct ifinfomsg));
+
+			free(lrd->ifname);
+			free(lrd->iim);
+			free(lrd);
+			goto out;
+		}
+	}
+
+	lrd->active = 1;
+	memcpy(lrd->iim, ifm, sizeof(struct ifinfomsg));
+	LIST_INSERT_HEAD(&linkrtl_head, lrd, entries);
+
+out:
+	return;
+}
+
+ssize_t snmp_recvfrom(const int fd, void *buf, size_t len)
+{
+	struct sockaddr_nl da;
+	struct iovec iov = {
+		.iov_base = buf,
+		.iov_len  = len,
+	};
+	struct msghdr msg = {
+		.msg_name = &da,
+		.msg_namelen = sizeof(da),
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+		.msg_control = NULL,
+		.msg_controllen = 0,
+		.msg_flags = 0,
+	};
+
+	ssize_t ret = recvmsg(fd, &msg, 0);
+	if (ret < 0)
+		perror("snmp_recvfrom");
+
+	return ret;
+}
+
+int snmp_do_nl(void) {
+	struct rtgenmsg rt_hdr = { .rtgen_family = AF_PACKET, };
+	struct nl_sock *handle;
+	unsigned char *buf;
+	int done = 0;
+	int ret;
+
+	handle = nl_socket_alloc();
+	nl_connect(handle, NETLINK_ROUTE);
+	ret = nl_send_simple(handle, RTM_GETLINK, NLM_F_REQUEST | NLM_F_DUMP,
+			     &rt_hdr, sizeof(rt_hdr));
+	if (ret < 0) {
+		nl_close(handle);
+		nl_socket_free(handle);
+		return 1;
+	}
+
+	prepare_lrt_device_list();
+
+	while (!done) {
+		struct nlmsghdr *nlhb;
+
+		ret = nl_recv(handle, NULL, &buf, NULL);
+		nlhb = (struct nlmsghdr *) buf;
+		if (ret > 0) {
+			while(nlmsg_ok(nlhb, ret)) {
+				switch(nlhb->nlmsg_type) {
+					case 3:
+						done++;
+						break;
+					case 16:
+						snmp_parse_msg(nlhb);
+						break;
+					default:
+						break;
+				}
+				nlhb = nlmsg_next(nlhb, &ret);
+			}
+		} else {
+			done++; /*error on nlmsg recv*/
+		}
+	}
+
+	cleanup_lrt_device_list();
+	nl_close(handle);
+	nl_socket_free(handle);
+
+	return 0;
+}
+#endif

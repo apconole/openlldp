@@ -186,4 +186,25 @@ char *print_mac(char *mac, char *buf);
 	} while (0)
 
 
+#ifndef LIST_FOREACH_SAFE
+/**
+ * This macro expands the capability of the sys/queue.h
+ * LIST_FOREACH macro in that case, that it does safe the
+ * next pointer to a 2nd list, so the entry can be removed
+ * without accessing already freed memory.
+ *
+ * Example:
+ * struct device_list *list, *safe;
+ *
+ * LIST_FOREACH_SAFE(safe, list, list_head, field) {
+ *	...
+ *	free(list);
+ * }
+ */
+#define LIST_FOREACH_SAFE(pos, var, head, field)			\
+	for ((var) = ((head)->lh_first), pos = ((var)->field.le_next);	\
+	     (var);							\
+	     (var = pos), pos = (!pos) ? NULL : ((pos)->field.le_next))
+#endif
+
 #endif /* _LLDP_UTIL_H */

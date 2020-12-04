@@ -64,6 +64,18 @@ AC_SUBST(SPEC_FILE_LLDPAD_SERVICE, $specfile_install)
 AC_SUBST(SPEC_FILE_LLDPAD_SOCKET, $specfile_install_socket)
 dnl End systemd stuff
 
+
+AC_ARG_ENABLE([snmp],
+ [  --enable-snmp           enable Net-SNMP agentx subagent for MIB support],
+ [snmp=${enableval}], [snmp=no])
+
+if test "x${snmp}" = xyes; then
+  AC_DEFINE_UNQUOTED([HAVE_SNMP], 1, [subagent enabled])
+fi
+AM_CONDITIONAL([SNMP_SUPPORT], [test x${snmp} = xyes])
+
+AC_SUBST([LIBS])
+
 PKG_CHECK_MODULES([LIBCONFIG], [libconfig >= 1.3.2])
 PKG_CHECK_MODULES([LIBNL], [libnl-3.0 >= 3.2])
 

@@ -52,6 +52,18 @@ struct evb_data *evb_data(char *ifname, enum agent_type type)
 	return NULL;
 }
 
+enum lldp_evb_systype get_evbsystype(void)
+{
+	struct evb_user_data *ud;
+
+	ud = find_module_user_data_by_id(&lldp_mod_head, LLDP_MOD_EVB);
+	if (ud) {
+		return ud->evbsystype;
+	}
+
+	return EVB_SYSTYPE_UNKN;
+}
+
 static void evb_print_tlvinfo(char *ifname, struct tlv_info_evb *tlv)
 {
 	LLDPAD_INFO("%s evb supported/configured forwarding mode: %#02x/%#02x "
@@ -453,6 +465,7 @@ struct lldp_module *evb_register(void)
 		return NULL;
 	}
 	LIST_INIT(&ud->head);
+	ud->evbsystype = EVB_SYSTYPE_STATION;
 	mod->id = LLDP_MOD_EVB;
 	mod->ops = &evb_ops;
 	mod->data = ud;

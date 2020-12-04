@@ -18,9 +18,28 @@ ACLOCAL_AMFLAGS = -I m4
 
 parse_cli.o: CFLAGS+=-U_FORTIFY_SOURCE -Wno-error
 
+NETSNMP_LIBS =
+NETSNMP_CFLAGS =
+snmp_sources =
+
+if SNMP_SUPPORT
+## Based on the demoapp from netnsmp
+## Collect cflags and ldflags
+NETSNMP_CONFIG=net-snmp-config
+NETSNMP_CFLAGS += `$(NETSNMP_CONFIG) --base-cflags` -fPIC
+NETSNMP_LIBS +=`$(NETSNMP_CONFIG) --libs` -lpthread
+NETSNMP_AGENTLIBS=`$(NETSNMP_CONFIG) --agent-libs`
+
+snmp_sources += snmp/ieee8021BridgeBaseTable.c snmp/ieee8021BridgeBaseTable.h \
+	snmp/ieee8021BridgeEvbSys.c snmp/ieee8021BridgeEvbSys.h \
+	snmp/include/lldpad_snmp.h snmp/subagent.c snmp/lldp_snmp.c \
+	snmp/snmp/ieee_mib.h snmp/snmp/snmp_agent.h \
+	snmp/snmp/net-snmp-features.h
+endif
+
 ## system requires a shared libconfig
-AM_CFLAGS = $(LIBCONFIG_CFLAGS) $(LIBNL_CFLAGS)
-AM_LDFLAGS = $(LIBCONFIG_LIBS) $(LIBNL_LIBS) -lrt
+AM_CFLAGS = $(LIBCONFIG_CFLAGS) $(LIBNL_CFLAGS) $(NETSNMP_CFLAGS)
+AM_LDFLAGS = $(LIBCONFIG_LIBS) $(NETSNMP_AGENTLIBS) $(LIBNL_LIBS) -lrt
 
 ## header files to be installed, for programs using the client interface to lldpad 
 lldpad_includedir= ${includedir}/lldpad
@@ -54,7 +73,7 @@ include/linux/if.h include/linux/if_link.h include/linux/if_vlan.h
 lldpad_SOURCES = lldpad.c config.c lldp_dcbx_nl.c ctrl_iface.c \
 event_iface.c eloop.c lldp_dcbx_cmds.c log.c lldpad_shm.c \
 dcb_protocol.c dcb_rule_chk.c  list.c lldp_rtnl.c \
-$(lldpad_include_HEADERS) $(noinst_HEADERS) \
+$(lldpad_include_HEADERS) $(noinst_HEADERS) $(snmp_sources) \
 lldp/ports.c lldp/agent.c lldp/l2_packet_linux.c lldp/tx.c \
 lldp/rx.c lldp/agent.h lldp/l2_packet.h lldp/mibdata.h lldp/ports.h \
 lldp/states.h include/lldp.h include/lldp_mod.h \
@@ -72,6 +91,7 @@ lldp_med.c include/lldp_med.h \
 lldp_8023.c include/lldp_8023.h \
 lldp_8021qaz.c include/lldp_8021qaz.h \
 lldp_8021qaz_cmds.c include/lldp_8021qaz_cmds.h \
+snmp/lldp_snmp_ctl.c \
 include/lldp_evb22.h lldp_evb22.c lldp_evb22_cmds.c \
 include/qbg22.h include/qbg_ecp22.h qbg/ecp22.c \
 include/qbg_vdp22.h qbg/vdp22.c qbg/vdpnl.c qbg/vdp22sm.c qbg/vdp22br.c \

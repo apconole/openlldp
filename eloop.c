@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include "eloop.h"
 #include "include/messages.h"
+#include "snmp/include/lldpad_snmp.h"
 
 #define UNUSED __attribute__((__unused__))
 
@@ -499,7 +500,7 @@ void eloop_run(void)
 		eloop_sock_table_set_fds(&eloop.exceptions, efds);
 		res = select(eloop.max_sock + 1, rfds, wfds, efds,
 			     eloop.timeout ? &_tv : NULL);
-		if (res < 0 && errno != EINTR && errno != 0) {
+		if (res < 0 && errno != EINTR && errno != 0 && snmpfds(rfds) == 0) {
 			perror("select");
 			goto out;
 		}

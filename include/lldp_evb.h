@@ -32,6 +32,12 @@
 #define LLDP_MOD_EVB		OUI_IEEE_8021Qbg
 #define LLDP_OUI_SUBTYPE	{ 0x00, 0x1b, 0x3f, 0x00 }
 
+enum lldp_evb_systype {
+	EVB_SYSTYPE_UNKN = 0,
+	EVB_SYSTYPE_BRIDGE,
+    EVB_SYSTYPE_STATION,
+};
+
 struct tlv_info_evb {	/* EVB TLV definition */
 	u8 oui[3];
 	u8 sub;
@@ -56,6 +62,7 @@ struct evb_data {
 };
 
 struct evb_user_data {
+	enum lldp_evb_systype evbsystype;     /* Supporting station only. */
 	LIST_HEAD(evb_head, evb_data) head;
 };
 
@@ -68,5 +75,6 @@ u8 evb_conf_rte(char *, enum agent_type);
 u16 evb_conf_vsis(char *, enum agent_type);
 int evb_conf_enabletx(char *, enum agent_type);
 struct evb_data *evb_data(char *, enum agent_type);
+enum lldp_evb_systype get_evbsystype(void);
 
 #endif /* _LLDP_EVB_H */

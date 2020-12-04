@@ -62,6 +62,10 @@
 #include "lldp/l2_packet.h"
 #include "clif.h"
 
+#if HAVE_SNMP
+#include "snmp/include/lldpad_snmp.h"
+#endif
+
 /*
  * insert to head, so first one is last
  */
@@ -77,6 +81,9 @@ struct lldp_module *(*register_tlv_table[])(void) = {
 	vdp22_register,
 	ecp22_register,
 	ieee8021qaz_register,
+#if HAVE_SNMP
+	lldpad_snmp_register,
+#endif
 	NULL,
 };
 
